@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Instagram Followers</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: grid; place-items: center; min-height: 100vh; margin: 0;
+      background: radial-gradient(circle at 50% 30%, #1a1a24, #0f0f14);
+    }
+    .wrap { text-align: center; }
+    .count {
+      font-size: clamp(3rem, 15vw, 7rem); font-weight: 800; color: #fff;
+      line-height: 1; letter-spacing: -0.02em;
+    }
+    .label {
+      margin-top: 1rem; color: #8a8a99;
+      letter-spacing: 0.25em; text-transform: uppercase; font-size: 0.85rem;
+    }
+    .stamp { margin-top: 2rem; color: #55555f; font-size: 0.7rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="count" id="count">—</div>
+    <div class="label">Instagram Followers</div>
+    <div class="stamp" id="stamp"></div>
+  </div>
+
+  <script>
+    async function load() {
+      try {
+        // cache-bust so the browser always sees the latest push
+        const res = await fetch("followers.json?t=" + Date.now());
+        const data = await res.json();
+        document.getElementById("count").textContent =
+          Number(data.followers).toLocaleString();
+        if (data.updated) {
+          const when = new Date(data.updated).toLocaleString();
+          document.getElementById("stamp").textContent = "Updated " + when;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    load();
+    setInterval(load, 5 * 60 * 1000); // refresh the display every 5 minutes
+  </script>
+</body>
+</html>
