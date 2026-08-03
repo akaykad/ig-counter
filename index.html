@@ -1,53 +1,314 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Instagram Followers</title>
-  <style>
-    :root { color-scheme: dark; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      display: grid; place-items: center; min-height: 100vh; margin: 0;
-      background: radial-gradient(circle at 50% 30%, #1a1a24, #0f0f14);
-    }
-    .wrap { text-align: center; }
-    .count {
-      font-size: clamp(3rem, 15vw, 7rem); font-weight: 800; color: #fff;
-      line-height: 1; letter-spacing: -0.02em;
-    }
-    .label {
-      margin-top: 1rem; color: #8a8a99;
-      letter-spacing: 0.25em; text-transform: uppercase; font-size: 0.85rem;
-    }
-    .stamp { margin-top: 2rem; color: #55555f; font-size: 0.7rem; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thaplet — follower count</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#140f1f; --bg2:#1b1430; --surface:#221a3a; --line:#2e2450;
+    --ink:#f4efff; --muted:#9384b8; --dim:#6a5d8f;
+    --hot:#ff5e7e; --warm:#ffab52;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:"Space Grotesk",system-ui,sans-serif;color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #2a1d4d 0%, transparent 60%),
+      linear-gradient(180deg,var(--bg2),var(--bg));
+    min-height:100%;display:grid;place-items:center;padding:24px;
+  }
+  .mono{font-family:"Space Mono",ui-monospace,monospace}
+  .eyebrow{
+    font-family:"Space Mono",monospace;text-transform:uppercase;
+    letter-spacing:.28em;font-size:.66rem;color:var(--dim);
+  }
+  .panel{
+    width:min(680px,100%);
+    background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0)), var(--surface);
+    border:1px solid var(--line);border-radius:24px;padding:38px 34px 8px;
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.04);
+    position:relative;overflow:hidden;
+  }
+  .head{display:flex;align-items:center;gap:10px;margin-bottom:30px}
+  .brand{font-weight:700;font-size:1.02rem;letter-spacing:-.01em}
+  .status{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--hot);
+    box-shadow:0 0 0 0 rgba(255,94,126,.6);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,94,126,.55)}
+    70%{box-shadow:0 0 0 9px rgba(255,94,126,0)}100%{box-shadow:0 0 0 0 rgba(255,94,126,0)}}
+  .status .txt{font-size:.68rem;color:var(--dim)}
+
+  .readout{position:relative;z-index:2}
+  .count{
+    font-weight:700;font-variant-numeric:tabular-nums;
+    font-size:clamp(3.6rem,14vw,6.4rem);line-height:.92;letter-spacing:-.03em;
+    background:linear-gradient(90deg,#fff,#ffe3d0);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .sub{display:flex;align-items:baseline;gap:14px;margin-top:14px;flex-wrap:wrap}
+  .delta{
+    font-family:"Space Mono",monospace;font-size:.82rem;font-weight:700;
+    padding:4px 10px;border-radius:999px;background:rgba(255,171,82,.12);
+    color:var(--warm);border:1px solid rgba(255,171,82,.25);
+  }
+  .delta.down{background:rgba(255,94,126,.12);color:var(--hot);border-color:rgba(255,94,126,.28)}
+  .sub .label{font-size:.78rem;color:var(--muted)}
+  .asof{margin-top:20px;font-family:"Space Mono",monospace;font-size:.72rem;color:var(--muted)}
+  .asof b{color:var(--ink);font-weight:700}
+
+  .chartwrap{position:relative;margin:18px -34px 0;height:190px}
+  canvas{display:block}
+
+  .foot{display:flex;align-items:center;justify-content:flex-end;padding:16px 0 4px}
+  .ranges{display:flex;gap:6px}
+  .ranges button{
+    font-family:"Space Mono",monospace;font-size:.68rem;letter-spacing:.05em;
+    color:var(--muted);background:transparent;border:1px solid var(--line);
+    padding:6px 12px;border-radius:999px;cursor:pointer;transition:.15s;
+  }
+  .ranges button:hover{color:var(--ink);border-color:var(--dim)}
+  .ranges button[aria-pressed="true"]{
+    color:var(--bg);background:linear-gradient(90deg,var(--hot),var(--warm));border-color:transparent;
+  }
+  .ranges button:focus-visible{outline:2px solid var(--warm);outline-offset:3px}
+
+  
+  .divider{height:1px;background:var(--line);margin:22px -34px 0}
+  .daily{padding-top:24px}
+  .daily .eyebrow{margin-bottom:16px}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+  .metric{
+    background:rgba(255,255,255,.025);border:1px solid var(--line);
+    border-radius:14px;padding:14px 16px;
+  }
+  .metric .v{font-weight:700;font-variant-numeric:tabular-nums;font-size:1.5rem;letter-spacing:-.02em}
+  .metric .v.up{color:var(--warm)} .metric .v.down{color:var(--hot)}
+  .metric .k{font-size:.6rem;margin-top:4px}
+  .barwrap{position:relative;height:150px;margin:0 -6px}
+  .empty{
+    color:var(--dim);font-family:"Space Mono",monospace;font-size:.78rem;
+    text-align:center;padding:38px 10px;line-height:1.6;
+  }
+  @media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+  @media (max-width:520px){
+    .panel{padding:28px 22px 6px}
+    .chartwrap{margin-left:-22px;margin-right:-22px}
+    .divider{margin-left:-22px;margin-right:-22px}
+    .metric .v{font-size:1.25rem}
+  }
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="count" id="count">—</div>
-    <div class="label">Instagram Followers</div>
-    <div class="stamp" id="stamp"></div>
-  </div>
+  <main class="panel" role="main">
+    <div class="head">
+      <span class="brand" id="brand">Thaplet</span>
+      <div class="status">
+        <span class="pulse" aria-hidden="true"></span>
+        <span class="txt" id="updated">live</span>
+      </div>
+    </div>
 
-  <script>
-    async function load() {
-      try {
-        // cache-bust so the browser always sees the latest push
-        const res = await fetch("followers.json?t=" + Date.now());
-        const data = await res.json();
-        document.getElementById("count").textContent =
-          Number(data.followers).toLocaleString();
-        if (data.updated) {
-          const when = new Date(data.updated).toLocaleString();
-          document.getElementById("stamp").textContent = "Updated " + when;
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    load();
-    setInterval(load, 5 * 60 * 1000); // refresh the display every 5 minutes
-  </script>
+    <div class="readout">
+      <div class="eyebrow">Instagram followers</div>
+      <div class="count" id="count">—</div>
+      <div class="sub">
+        <span class="delta" id="delta" style="display:none"></span>
+        <span class="label" id="deltaLabel"></span>
+      </div>
+      <div class="asof">as of <b id="asof">—</b></div>
+    </div>
+
+    <div class="chartwrap"><canvas id="chart"></canvas></div>
+
+    <div class="foot">
+      <div class="ranges" role="group" aria-label="Trend range">
+        <button data-h="24" aria-pressed="true">24H</button>
+        <button data-h="168" aria-pressed="false">7D</button>
+        <button data-h="0" aria-pressed="false">ALL</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <section class="daily">
+      <div class="eyebrow">Daily gain</div>
+      <div class="metrics">
+        <div class="metric"><div class="v" id="mToday">—</div><div class="k eyebrow">Today</div></div>
+        <div class="metric"><div class="v" id="mAvg">—</div><div class="k eyebrow">7-day avg / day</div></div>
+        <div class="metric"><div class="v" id="mBest">—</div><div class="k eyebrow">Best day</div></div>
+      </div>
+      <div class="barwrap"><canvas id="bars"></canvas></div>
+      <div class="empty" id="dailyEmpty" style="display:none">
+        Gathering daily data.<br>The first bars appear once there are two days of readings.
+      </div>
+    </section>
+  </main>
+
+<script>
+const fmt = n => Number(n).toLocaleString();
+const signed = n => (n>=0?'+':'−')+fmt(Math.abs(Math.round(n)));
+const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+let history = [], rangeH = 24, line, bars;
+
+function ago(iso){
+  if(!iso) return 'live';
+  const s = Math.floor((Date.now()-new Date(iso))/1000);
+  if(s<90) return 'updated just now';
+  if(s<3600) return 'updated '+Math.floor(s/60)+'m ago';
+  if(s<86400) return 'updated '+Math.floor(s/3600)+'h ago';
+  return 'updated '+Math.floor(s/86400)+'d ago';
+}
+function asOf(iso){
+  if(!iso) return '—';
+  return new Date(iso).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function countUp(el, to){
+  if(reduce || !isFinite(to)){ el.textContent = fmt(to); return; }
+  const from = Math.max(0, Math.floor(to*0.94)), dur=900, t0=performance.now();
+  (function step(t){
+    const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3);
+    el.textContent = fmt(Math.round(from+(to-from)*e));
+    if(p<1) requestAnimationFrame(step);
+  })(performance.now());
+}
+
+function makeLine(){
+  const ctx = document.getElementById('chart').getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,0,190);
+  grad.addColorStop(0,'rgba(255,94,126,.42)'); grad.addColorStop(1,'rgba(255,171,82,0)');
+  line = new Chart(ctx,{
+    type:'line',
+    data:{datasets:[{data:[],borderWidth:2.4,borderColor:'#ff7a6e',fill:true,
+      backgroundColor:grad,pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:'#fff',tension:.35}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:reduce?false:{duration:900},
+      layout:{padding:{top:6}},parsing:false,
+      scales:{x:{type:'linear',display:false},y:{display:false,grace:'12%'}},
+      plugins:{legend:{display:false},
+        tooltip:{displayColors:false,backgroundColor:'#140f1f',borderColor:'#2e2450',borderWidth:1,padding:10,
+          titleFont:{family:'Space Mono',size:10},bodyFont:{family:'Space Grotesk',weight:'700',size:14},
+          callbacks:{
+            title:i=>new Date(i[0].parsed.x).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+            label:i=>fmt(i.parsed.y)+' followers'}}}}
+  });
+}
+function drawLine(){
+  const cutoff = rangeH ? Date.now()-rangeH*3600e3 : 0;
+  line.data.datasets[0].data = history.map(p=>({x:new Date(p.t).getTime(),y:p.followers}))
+                                      .filter(p=>p.x>=cutoff);
+  line.update();
+}
+function computeDelta(){
+  const el=document.getElementById('delta'), lab=document.getElementById('deltaLabel');
+  if(history.length<2) return;
+  const now=history[history.length-1].followers, target=Date.now()-24*3600e3;
+  let ref=history[0];
+  for(const p of history){ if(new Date(p.t).getTime()<=target) ref=p; else break; }
+  const d=now-ref.followers;
+  el.style.display='inline-block'; el.textContent=signed(d);
+  el.classList.toggle('down',d<0); lab.textContent='in the last 24 hours';
+}
+
+function dayKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function dailyGains(){
+  const endOfDay = new Map();               // day -> last follower reading that day
+  for(const p of history) endOfDay.set(dayKey(new Date(p.t)), p.followers);
+  const days = [...endOfDay.keys()].sort();
+  const gains = [];                         // {day, gain}
+  for(let i=1;i<days.length;i++)
+    gains.push({day:days[i], gain:endOfDay.get(days[i]) - endOfDay.get(days[i-1])});
+  return gains;
+}
+function makeBars(){
+  bars = new Chart(document.getElementById('bars').getContext('2d'),{
+    type:'bar',
+    data:{labels:[],datasets:[{data:[],borderWidth:0,borderRadius:5,
+      backgroundColor:c=>c.raw>=0?'rgba(255,171,82,.85)':'rgba(255,94,126,.85)'}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:reduce?false:{duration:700},
+      scales:{
+        x:{grid:{display:false},border:{display:false},
+           ticks:{color:'#6a5d8f',font:{family:'Space Mono',size:9},maxRotation:0,autoSkipPadding:8}},
+        y:{grid:{color:'rgba(255,255,255,.05)'},border:{display:false},
+           ticks:{color:'#6a5d8f',font:{family:'Space Mono',size:9},maxTicksLimit:4}}},
+      plugins:{legend:{display:false},
+        tooltip:{displayColors:false,backgroundColor:'#140f1f',borderColor:'#2e2450',borderWidth:1,padding:10,
+          titleFont:{family:'Space Mono',size:10},bodyFont:{family:'Space Grotesk',weight:'700',size:14},
+          callbacks:{label:i=>signed(i.parsed.y)+' followers'}}}}
+  });
+}
+function drawDaily(){
+  const gains = dailyGains();
+  const empty = document.getElementById('dailyEmpty');
+  const wrap = document.querySelector('.barwrap');
+  const set = (id,val,cls)=>{const e=document.getElementById(id);e.textContent=val;
+    e.className='v'+(cls?' '+cls:'');};
+
+  if(gains.length===0){
+    empty.style.display='block'; wrap.style.display='none';
+    const todayKey=dayKey(new Date());
+    const todays=history.filter(p=>dayKey(new Date(p.t))===todayKey);
+    if(todays.length>=2){const g=todays[todays.length-1].followers-todays[0].followers;
+      set('mToday',signed(g),g>=0?'up':'down');} else set('mToday','—');
+    set('mAvg','—'); set('mBest','—');
+    return;
+  }
+  empty.style.display='none'; wrap.style.display='block';
+
+  const last = gains.slice(-14);
+  bars.data.labels = last.map(g=>{const d=new Date(g.day+'T00:00');
+    return d.toLocaleDateString([], {month:'short',day:'numeric'});});
+  bars.data.datasets[0].data = last.map(g=>g.gain);
+  bars.update();
+
+  const todayKey = dayKey(new Date());
+  const todayEntry = gains.find(g=>g.day===todayKey);
+  const todayGain = todayEntry ? todayEntry.gain : null;
+  set('mToday', todayGain==null?'—':signed(todayGain), todayGain>=0?'up':'down');
+
+  const complete = gains.filter(g=>g.day!==todayKey);   // exclude partial today
+  const recent = complete.slice(-7);
+  if(recent.length){
+    const avg = recent.reduce((s,g)=>s+g.gain,0)/recent.length;
+    set('mAvg', signed(avg), avg>=0?'up':'down');
+  } else set('mAvg','—');
+
+  const pool = complete.length?complete:gains;
+  const best = pool.reduce((m,g)=>g.gain>m.gain?g:m, pool[0]);
+  set('mBest', signed(best.gain), best.gain>=0?'up':'down');
+}
+
+async function load(){
+  try{
+    const [meta,hist] = await Promise.all([
+      fetch('followers.json?t='+Date.now()).then(r=>r.json()),
+      fetch('history.json?t='+Date.now()).then(r=>r.ok?r.json():[]).catch(()=>[])
+    ]);
+    history = Array.isArray(hist)?hist:[];
+    countUp(document.getElementById('count'), meta.followers);
+    document.getElementById('updated').textContent = ago(meta.updated);
+    document.getElementById('asof').textContent = asOf(meta.updated);
+    if(!history.length) history=[{t:meta.updated,followers:meta.followers}];
+    drawLine(); computeDelta(); drawDaily();
+  }catch(e){
+    document.getElementById('updated').textContent = 'can’t reach data';
+    console.error(e);
+  }
+}
+document.querySelectorAll('.ranges button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.ranges button').forEach(x=>x.setAttribute('aria-pressed','false'));
+    b.setAttribute('aria-pressed','true'); rangeH=+b.dataset.h; drawLine();
+  });
+});
+makeLine(); makeBars(); load();
+setInterval(load, 5*60*1000);
+</script>
 </body>
 </html>
