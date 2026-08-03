@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""
-Fetches a public Instagram account's follower count and publishes it
-to followers.json in this repo, then commits + pushes so GitHub Pages
-serves the updated number.
-
-Runs on YOUR device (home PC / Raspberry Pi / phone via Termux) because
-Instagram blocks datacenter IPs. Your home internet is a residential IP,
-so it works.
-
-Only thing you must edit: USERNAME below.
-"""
-
 import os
 import json
 import subprocess
@@ -18,18 +6,22 @@ from datetime import datetime, timezone
 
 import requests
 
-# ---- EDIT THIS -------------------------------------------------------
-USERNAME = "target_account_here"   # display label only, for your reference
-USER_ID = "47074278351"            # the account's permanent numeric ID
-# ----------------------------------------------------------------------
+USERNAME = "thapletcom"
+USER_ID = "47074278351"
 
-# The repo is wherever this script lives — no path to configure.
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(REPO_DIR, "followers.json")
+HISTORY_FILE = os.path.join(REPO_DIR, "history.json")
+MAX_POINTS = 2000
+
+UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
 
 
-def _load_sessionid() -> str:
-    """Read the Instagram sessionid from session.txt (kept out of git) or env."""
+def load_sessionid():
     path = os.path.join(REPO_DIR, "session.txt")
     if os.path.exists(path):
         with open(path) as f:
@@ -37,30 +29,20 @@ def _load_sessionid() -> str:
     return os.environ.get("IG_SESSIONID", "")
 
 
-def get_count(user_id: str) -> int:
-    """Pull the follower count via the leaner users/{id}/info endpoint.
+def make_session():
+    s = requests.Session()
+    sid = load_sessionid()
+    if sid:
+        s.cookies.set("sessionid", sid, domain=".instagram.com")
+    s.get("https://www.instagram.com/", headers={"User-Agent": UA}, timeout=20)
+    return s
 
-    The full web_profile_info endpoint 400s on some business accounts (a broken
-    'business_category' asset). Querying by numeric ID against /info/ returns a
-    slimmer JSON that avoids that field entirely.
-    """
-    ua = (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    )
-    session = requests.Session()
 
-    sessionid = _load_sessionid()
-    if sessionid:
-        session.cookies.set("sessionid", sessionid, domain=".instagram.com")
-
-    session.get("https://www.instagram.com/", headers={"User-Agent": ua}, timeout=20)
-
-    resp = session.get(
+def get_profile(session, user_id):
+    r = session.get(
         f"https://i.instagram.com/api/v1/users/{user_id}/info/",
         headers={
-            "User-Agent": ua,
+            "User-Agent": UA,
             "x-ig-app-id": "936619743392459",
             "x-csrftoken": session.cookies.get("csrftoken", ""),
             "Accept": "*/*",
@@ -68,26 +50,51 @@ def get_count(user_id: str) -> int:
         },
         timeout=20,
     )
-    resp.raise_for_status()
-    return resp.json()["user"]["follower_count"]
+    r.raise_for_status()
+    return r.json()["user"]
 
 
-def publish(count: int) -> None:
-    """Write followers.json and push it only if the number changed."""
+def append_history(count, when):
+    history = []
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE) as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+    history.append({"t": when, "followers": count})
+    history = history[-MAX_POINTS:]
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(history, f)
+
+
+def publish(user):
+    count = user["follower_count"]
+    now = datetime.now(timezone.utc).isoformat()
+
     with open(DATA_FILE, "w") as f:
         json.dump(
-            {"followers": count, "updated": datetime.now(timezone.utc).isoformat()},
+            {
+                "followers": count,
+                "following": user.get("following_count"),
+                "posts": user.get("media_count"),
+                "username": user.get("username"),
+                "full_name": user.get("full_name"),
+                "is_verified": user.get("is_verified", False),
+                "updated": now,
+            },
             f,
         )
+
+    append_history(count, now)
 
     def git(*args):
         return subprocess.run(["git", "-C", REPO_DIR, *args])
 
-    git("add", "followers.json")
-    # returncode != 0 means there IS a staged change worth committing
+    git("add", "followers.json", "history.json")
     has_change = git("diff", "--cached", "--quiet").returncode != 0
     if has_change:
-        git("commit", "-m", f"update follower count: {count}")
+        git("commit", "-m", f"update: {count} followers")
         git("push")
         print(f"Published {count} followers.")
     else:
@@ -96,8 +103,9 @@ def publish(count: int) -> None:
 
 if __name__ == "__main__":
     try:
-        publish(get_count(USER_ID))
+        session = make_session()
+        profile = get_profile(session, USER_ID)
+        publish(profile)
     except Exception as e:
-        # Print and exit non-zero so cron logs show failures clearly.
         print(f"ERROR: {e}")
         raise
