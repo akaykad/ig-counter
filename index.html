@@ -79,7 +79,6 @@
   }
   .ranges button:focus-visible{outline:2px solid var(--warm);outline-offset:3px}
 
-  
   .divider{height:1px;background:var(--line);margin:22px -34px 0}
   .daily{padding-top:24px}
   .daily .eyebrow{margin-bottom:16px}
@@ -218,10 +217,10 @@ function dayKey(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function dailyGains(){
-  const endOfDay = new Map();               // day -> last follower reading that day
+  const endOfDay = new Map();
   for(const p of history) endOfDay.set(dayKey(new Date(p.t)), p.followers);
   const days = [...endOfDay.keys()].sort();
-  const gains = [];                         // {day, gain}
+  const gains = [];
   for(let i=1;i<days.length;i++)
     gains.push({day:days[i], gain:endOfDay.get(days[i]) - endOfDay.get(days[i-1])});
   return gains;
@@ -272,7 +271,7 @@ function drawDaily(){
   const todayGain = todayEntry ? todayEntry.gain : null;
   set('mToday', todayGain==null?'—':signed(todayGain), todayGain>=0?'up':'down');
 
-  const complete = gains.filter(g=>g.day!==todayKey);   // exclude partial today
+  const complete = gains.filter(g=>g.day!==todayKey);
   const recent = complete.slice(-7);
   if(recent.length){
     const avg = recent.reduce((s,g)=>s+g.gain,0)/recent.length;
